@@ -1,0 +1,28 @@
+name: Distributed JMeter Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  distributed-jmeter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+
+
+      - name: Run Distributed JMeter Action
+        uses: ./
+        with:
+          jmx-file: test-plan.jmx
+          user-properties: user.properties
+          num-slaves: 2
+          results-path: results
+
+      - name: Show results
+        run: |
+          ls -l results
+          cat results/client/*.log || true
+          cat results/client/*.jtl || true

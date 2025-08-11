@@ -1,0 +1,125 @@
+name: 'JMeter Distributed Master-Slave Setup'
+description: 'Setup and run JMeter in distributed (master-slave) mode using Docker on a GitHub runner.'
+author: 'Your Name'
+
+inputs:
+  jmx-file:
+    description: 'Path to the JMeter test plan (.jmx file)'
+    required: true
+  user-properties:
+    description: 'Path to user.properties file for JMeter configuration'
+    required: true
+  num-slaves:
+    description: 'Number of JMeter slave nodes to start'
+    required: false
+    default: '2'
+  docker-image:
+    description: 'Docker image to use for JMeter (must support server mode)'
+    required: false
+    default: 'justb4/jmeter:5.5'
+  results-path:
+    description: 'Path to store test results'
+    required: false
+    default: 'results'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        if [ ! -f "${{ inputs.jmx-file }}" ]; then
+          echo "❌ JMX file not found: ${{ inputs.jmx-file }}"; exit 1;
+        fi
+        if [ ! -f "${{ inputs.user-properties }}" ]; then
+          echo "❌ user.properties file not found: ${{ inputs.user-properties }}"; exit 1;
+        fi
+        mkdir -p "${{ inputs.results-path }}"
+
+    - name: Create Docker network for JMeter
+      shell: bash
+      id: network
+      run: |
+        set -e
+        NET_NAME="jmeter_net_${GITHUB_RUN_ID:-test}"
+        SUBNET="172.18.0.0/16"
+        docker network create --subnet=$SUBNET $NET_NAME
+        echo "net_name=$NET_NAME" >> $GITHUB_OUTPUT
+        echo "subnet=$SUBNET" >> $GITHUB_OUTPUT
+
+    - name: Start JMeter slave containers
+      shell: bash
+      id: slaves
+      run: |
+        set -e
+        NET_NAME="${{ steps.network.outputs.net_name }}"
+        BASE_IP=101
+        SLAVE_NAMES=()
+        SLAVE_IPS=()
+        for i in $(seq 1 ${{ inputs.num-slaves }}); do
+          IP="172.18.0.$((BASE_IP + i))"
+          NAME="jmeter-slave-$i"
+          docker run -d --rm \
+            --name $NAME \
+            --net $NET_NAME --ip $IP \
+            -v "$(pwd):/mnt/jmeter" \
+            -w /mnt/jmeter \
+            -e JVM_ARGS="-Dserver.rmi.ssl.disable=true" \
+            ${{ inputs.docker-image }} \
+            -s -n -Jclient.rmi.localport=7000 -Jserver.rmi.localport=60000 -j /mnt/jmeter/server/slave_${i}.log
+          SLAVE_NAMES+=("$NAME")
+          SLAVE_IPS+=("$IP")
+        done
+        echo "slave_names=${SLAVE_NAMES[*]}" >> $GITHUB_OUTPUT
+        echo "slave_ips=${SLAVE_IPS[*]}" >> $GITHUB_OUTPUT
+        echo "Started slaves: ${SLAVE_NAMES[*]} at IPs: ${SLAVE_IPS[*]}"
+
+    - name: Wait for slaves to be ready
+      shell: bash
+      run: |
+        sleep 10
+        echo "Assuming slaves are ready after 10 seconds."
+
+    - name: Run JMeter master
+      shell: bash
+      run: |
+        set -e
+        NET_NAME="${{ steps.network.outputs.net_name }}"
+        CLIENT_IP="172.18.0.23"
+        SLAVE_IPS=(${SLAVE_IPS:-$(echo ${{ steps.slaves.outputs.slave_ips }})})
+        SLAVE_LIST=$(IFS=, ; echo "${SLAVE_IPS[*]}")
+        TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+        RESULT_FILE="${{ inputs.results-path }}/results_${TIMESTAMP}.jtl"
+        docker run --rm \
+          --name jmeter-master \
+          --net $NET_NAME --ip $CLIENT_IP \
+          -v "$(pwd):/mnt/jmeter" \
+          -w /mnt/jmeter \
+          ${{ inputs.docker-image }} \
+          -n -X -Jclient.rmi.localport=7000 -R "$SLAVE_LIST" \
+          -t /mnt/jmeter/${{ inputs.jmx-file }} \
+          -l /mnt/jmeter/client/result_${TIMESTAMP}.jtl \
+          -j /mnt/jmeter/client/jmeter_${TIMESTAMP}.log \
+          -q /mnt/jmeter/${{ inputs.user-properties }}
+        echo "Results saved to $RESULT_FILE"
+
+    - name: Stop JMeter slave containers
+      if: always()
+      shell: bash
+      run: |
+        for i in $(seq 1 ${{ inputs.num-slaves }}); do
+          docker stop jmeter-slave-$i || true
+        done
+
+    - name: Remove Docker network
+      if: always()
+      shell: bash
+      run: |
+        NET_NAME="jmeter_net_${GITHUB_RUN_ID:-test}"
+        docker network rm $NET_NAME || true
+
+    - name: Upload results
+      uses: actions/upload-artifact@v4
+      with:
+        name: jmeter-distributed-results
+        path: ${{ inputs.results-path }}/
