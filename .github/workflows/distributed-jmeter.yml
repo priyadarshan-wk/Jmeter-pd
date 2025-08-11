@@ -20,6 +20,11 @@ jobs:
           user-properties: user.properties
           num-slaves: 2
           results-path: results
+      - name: show all container info in details
+        run: |
+          docker ps -a
+          docker network ls
+          docker inspect $(docker ps -aq) || true
 
       - name: Show results
         run: |
