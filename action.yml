@@ -64,9 +64,9 @@ runs:
             --net $NET_NAME --ip $IP \
             -v "$(pwd):/mnt/jmeter" \
             -w /mnt/jmeter \
-            -e JVM_ARGS="-Dserver.rmi.ssl.disable=true" \
+            -e JMETER_JVM_ARGS="-Dserver.rmi.ssl.disable=true" \
             ${{ inputs.docker-image }} \
-            -s -n -Jclient.rmi.localport=7000 -Jserver.rmi.localport=60000 -Jserver.rmi.ssl.disable=true -j /mnt/jmeter/server/slave_${i}.log
+            -s -n -Jclient.rmi.localport=7000 -Jserver.rmi.localport=60000 -j /mnt/jmeter/server/slave_${i}.log
           SLAVE_NAMES+=("$NAME")
           SLAVE_IPS+=("$IP")
         done
@@ -95,9 +95,9 @@ runs:
           --net $NET_NAME --ip $CLIENT_IP \
           -v "$(pwd):/mnt/jmeter" \
           -w /mnt/jmeter \
-          -e JVM_ARGS="-Dclient.rmi.ssl.disable=true" \
+          -e JMETER_JVM_ARGS="-Dclient.rmi.ssl.disable=true" \
           ${{ inputs.docker-image }} \
-          -n -X -Jclient.rmi.localport=7000 -Jclient.rmi.ssl.disable=true -R "$SLAVE_LIST" \
+          -n -X -Jclient.rmi.localport=7000 -R "$SLAVE_LIST" \
           -t /mnt/jmeter/${{ inputs.jmx-file }} \
           -l /mnt/jmeter/client/result_${TIMESTAMP}.jtl \
           -j /mnt/jmeter/client/jmeter_${TIMESTAMP}.log \
