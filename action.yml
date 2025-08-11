@@ -64,7 +64,7 @@ runs:
             --net $NET_NAME --ip $IP \
             -v "$(pwd):/mnt/jmeter" \
             -w /mnt/jmeter \
-            -e JMETER_JVM_ARGS="-Dserver.rmi.ssl.disable=true" \
+            -e JMETER_JVM_ARGS="-Dserver.rmi.ssl.disable=true -Djavax.net.ssl.keyStore=none" \
             ${{ inputs.docker-image }} \
             -s -n -Jclient.rmi.localport=7000 -Jserver.rmi.localport=60000 -j /mnt/jmeter/server/slave_${i}.log
           SLAVE_NAMES+=("$NAME")
@@ -77,8 +77,8 @@ runs:
     - name: Wait for slaves to be ready
       shell: bash
       run: |
-        sleep 10
-        echo "Assuming slaves are ready after 10 seconds."
+        sleep 60
+        echo "Assuming slaves are ready after 60 seconds."
 
     - name: Run JMeter master
       shell: bash
