@@ -16,7 +16,7 @@ inputs:
   docker-image:
     description: 'Docker image to use for JMeter (must support server mode)'
     required: false
-    default: 'jmeter-custom:latest'
+    default: 'justb4/jmeter:5.5'
   results-path:
     description: 'Path to store test results'
     required: false
@@ -35,10 +35,10 @@ runs:
           echo "❌ user.properties file not found: ${{ inputs.user-properties }}"; exit 1;
         fi
         mkdir -p "${{ inputs.results-path }}"
-    - name: Build custom JMeter Docker image
-      shell: bash
-      run: |
-        docker build -t jmeter-custom:latest .
+    # - name: Build custom JMeter Docker image
+    #   shell: bash
+    #   run: |
+    #     docker build -t jmeter-custom:latest .
     - name: Create Docker network for JMeter
       shell: bash
       id: network
@@ -67,7 +67,7 @@ runs:
             --net $NET_NAME --ip $IP \
             -v "$(pwd):/mnt/jmeter" \
             -w /mnt/jmeter \
-            jmeter-custom:latest \
+            justb4/jmeter:5.5 \
             -s -n -Jclient.rmi.localport=7000 -Jserver.rmi.localport=60000 -j /mnt/jmeter/server/slave_${i}.log
           SLAVE_NAMES+=("$NAME")
           SLAVE_IPS+=("$IP")
@@ -97,7 +97,7 @@ runs:
           --net $NET_NAME --ip $CLIENT_IP \
           -v "$(pwd):/mnt/jmeter" \
           -w /mnt/jmeter \
-          jmeter-custom:latest \
+          justb4/jmeter:5.5 \
           -n -X -Jclient.rmi.localport=7000 -R "$SLAVE_LIST" \
           -t /mnt/jmeter/${{ inputs.jmx-file }} \
           -l /mnt/jmeter/client/result_${TIMESTAMP}.jtl \

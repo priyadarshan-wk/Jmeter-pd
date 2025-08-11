@@ -16,7 +16,7 @@ RUN wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-$JMETER_V
     rm apache-jmeter-$JMETER_VERSION.tgz
 
 # Disable SSL for RMI by default
-ENV JMETER_JVM_ARGS="-Dserver.rmi.ssl.disable=true -Dclient.rmi.ssl.disable=true"
+ENV JVM_ARGS="-Dserver.rmi.ssl.disable=true -Dclient.rmi.ssl.disable=true"
 
 # Create folders for logs and results
 RUN mkdir -p /mnt/jmeter/server /mnt/jmeter/client
