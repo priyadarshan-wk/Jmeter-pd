@@ -79,9 +79,13 @@ runs:
     - name: Wait for slaves to be ready
       shell: bash
       run: |
-        sleep 60
-        echo "Assuming slaves are ready after 60 seconds."
-
+        sleep 30
+        echo "Assuming slaves are ready after 30 seconds."
+    - name: show all container info in details
+      run: |
+        docker ps -a
+        docker network ls
+        docker inspect $(docker ps -aq) || true
     - name: Run JMeter master
       shell: bash
       run: |
